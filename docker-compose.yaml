@@ -1,15 +1,56 @@
 version: "3.8"
 
-services: 
+services:
   server:
+    container_name: fast-nginx-server
     build:
       context: .
-      dockerfile: dockerfiles/nginx.dockerfile
+      dockerfile: 'dockerfiles/server.dockerfile'
     ports: 
-      - '8000:80'
-    volumes: 
-      - ./src:/var/www/html
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      - php
-      - mysql
+      - "80:8001"
+    volumes: &appvolumes
+      - ~/.composer:/var/www/.composer:cached
+      - appdata:/var/www/html
+      - sockdata:/sock
+      - /home/danielcintra/Projetos/docker-magento-2-php-8.1-nginx-mariadb/src:/var/www/html
+  
+  phpfpm:
+    container_name: fast-phpfpm
+    build:
+      context: ./dockerfiles/php/8.1/
+      dockerfile: 'Dockerfile'
+    volumes: *appvolumes
+    env_file: env/phpfpm.env
+    # extra_hosts: *appextrahosts
+
+  db:
+    container_name: fast-mariadb
+    image: mariadb:10.4
+    command:
+      --max_allowed_packet=64M
+      --optimizer_use_condition_selectivity=1
+      --optimizer_switch="rowid_filter=off"
+    ports:
+      - "3306:3306"
+    env_file: env/db.env
+    volumes:
+      - dbdata:/var/lib/mysql
+  
+  opensearch:
+    container_name: fast-opensearch
+    image: markoshust/magento-opensearch:1.2-0
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    env_file: env/opensearch.env
+    environment:
+      - "discovery.type=single-node"
+      ## Avoid test failures due to small disks
+      ## More info at https://github.com/markshust/docker-magento/issues/488
+      - "cluster.routing.allocation.disk.threshold_enabled=false"
+      - "index.blocks.read_only_allow_delete"
+
+volumes:
+  appdata:
+  dbdata:
+  sockdata:
