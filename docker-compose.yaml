@@ -5,8 +5,8 @@ services:
     container_name: fast-nginx-server
     build:
       context: .
-      dockerfile: 'dockerfiles/server.dockerfile'
-    ports: 
+      dockerfile: "dockerfiles/server.dockerfile"
+    ports:
       - "80:8001"
     volumes: &appvolumes
       - ~/.composer:/var/www/.composer:cached
@@ -18,16 +18,15 @@ services:
     container_name: fast-phpfpm
     build:
       context: ./dockerfiles/php/8.1/
-      dockerfile: 'Dockerfile'
+      dockerfile: "Dockerfile"
     volumes: *appvolumes
     env_file: env/phpfpm.env
     # extra_hosts: *appextrahosts
 
   db:
     container_name: fast-mariadb
-    image: mariadb:10.4
-    command:
-      --max_allowed_packet=64M
+    image: mariadb:10.6.8
+    command: --max_allowed_packet=64M
       --optimizer_use_condition_selectivity=1
       --optimizer_switch="rowid_filter=off"
     ports:
@@ -35,7 +34,7 @@ services:
     env_file: env/db.env
     volumes:
       - dbdata:/var/lib/mysql
-  
+
   opensearch:
     container_name: fast-opensearch
     image: markoshust/magento-opensearch:1.2-0
