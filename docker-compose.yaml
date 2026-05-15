@@ -11,14 +11,14 @@ services:
     volumes: &appvolumes
       - ~/.composer:/var/www/.composer:cached
       - sockdata:/sock
-      - /home/danielcintra/Projetos/docker-magento-2-php-8.1-nginx-mariadb/src:/var/www/html
-      - /home/danielcintra/Projetos/docker-magento-2-php-8.1-nginx-mariadb/dockerfiles/php/8.1/conf/php.ini:/usr/local/etc/php/php.ini
-      - /home/danielcintra/Projetos/docker-magento-2-php-8.1-nginx-mariadb/nginx/magento2.conf:/etc/nginx/conf.d/magento2.conf
+      - /home/diogowsl/repositorio/docker-dani/src:/var/www/html
+      - /home/diogowsl/repositorio/docker-dani/dockerfiles/php/8.2/conf/php.ini:/usr/local/etc/php/php.ini
+      - /home/diogowsl/repositorio/docker-dani/nginx/magento2.conf:/etc/nginx/conf.d/magento2.conf
       
   phpfpm:
     container_name: fast-phpfpm
     build:
-      context: ./dockerfiles/php/8.1/
+      context: ./dockerfiles/php/8.2/
       dockerfile: "Dockerfile"
     volumes: *appvolumes
     env_file: env/phpfpm.env
@@ -49,6 +49,13 @@ services:
       ## More info at https://github.com/markshust/docker-magento/issues/488
       - "cluster.routing.allocation.disk.threshold_enabled=false"
       - "index.blocks.read_only_allow_delete"
+
+  mailcatcher:
+    container_name: fast-mailcatcher
+    image: schickling/mailcatcher
+    ports:
+      - "1080:1080"
+      - "1025:1025"
 
 volumes:
   dbdata:

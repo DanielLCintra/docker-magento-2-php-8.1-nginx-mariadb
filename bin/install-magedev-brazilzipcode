@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+set -o errexit
+
+echo "=========================================="
+echo "Instalação do Módulo MageDev_BrazilZipCode"
+echo "=========================================="
+echo ""
+
+# Cores para output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Função para exibir mensagens
+info() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
+
+warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Verificar se estamos no diretório correto
+if [ ! -d "src/app/code" ]; then
+    error "Diretório src/app/code não encontrado. Execute este script na raiz do projeto."
+    exit 1
+fi
+
+# Passo 1: Verificar se o módulo existe
+info "Passo 1: Verificando se o módulo está presente..."
+if [ ! -d "src/app/code/MageDev/BrazilZipCode" ]; then
+    error "Módulo não encontrado em src/app/code/MageDev/BrazilZipCode"
+    error "Por favor, certifique-se de que o módulo está presente no código."
+    exit 1
+fi
+
+if [ ! -f "src/app/code/MageDev/BrazilZipCode/etc/module.xml" ]; then
+    error "Arquivo module.xml não encontrado!"
+    exit 1
+fi
+
+if [ ! -f "src/app/code/MageDev/BrazilZipCode/registration.php" ]; then
+    error "Arquivo registration.php não encontrado!"
+    exit 1
+fi
+
+info "✓ Módulo encontrado e estrutura válida"
+
+# Passo 2: Verificar config.php
+info "Passo 2: Verificando config.php..."
+if grep -q "MageDev_BrazilZipCode" src/app/etc/config.php 2>/dev/null; then
+    MODULE_STATUS=$(grep "MageDev_BrazilZipCode" src/app/etc/config.php | grep -o "[01]")
+    if [ "$MODULE_STATUS" = "1" ]; then
+        info "✓ Módulo já está habilitado no config.php"
+    else
+        warn "Módulo está desabilitado no config.php (status: 0)"
+        info "Será habilitado durante o processo..."
+    fi
+else
+    warn "Módulo não encontrado no config.php. Será adicionado automaticamente."
+fi
+
+# Passo 3: Verificar permissões
+info "Passo 3: Verificando permissões..."
+if [ -w "src/app/code/MageDev/BrazilZipCode" ]; then
+    info "✓ Permissões OK"
+else
+    warn "Problemas com permissões detectados. Tentando corrigir..."
+    bin/fixperms 2>/dev/null || true
+fi
+
+# Passo 4: Limpar cache
+info "Passo 4: Limpando cache..."
+bin/clinotty bin/magento cache:clean 2>/dev/null || warn "Não foi possível limpar cache (pode ser normal)"
+bin/clinotty bin/magento cache:flush 2>/dev/null || warn "Não foi possível fazer flush do cache (pode ser normal)"
+info "✓ Cache limpo"
+
+# Passo 5: Limpar generated e di
+info "Passo 5: Limpando código gerado..."
+if [ -d "src/generated" ]; then
+    rm -rf src/generated/* 2>/dev/null || true
+    info "✓ Diretório generated limpo"
+fi
+
+if [ -d "src/var/di" ]; then
+    rm -rf src/var/di/* 2>/dev/null || true
+    info "✓ Diretório var/di limpo"
+fi
+
+if [ -d "src/var/generation" ]; then
+    rm -rf src/var/generation/* 2>/dev/null || true
+    info "✓ Diretório var/generation limpo"
+fi
+
+# Passo 6: Executar setup:upgrade
+info "Passo 6: Executando setup:upgrade para registrar o módulo..."
+if bin/clinotty bin/magento setup:upgrade 2>&1 | tee /tmp/magento_setup_upgrade.log; then
+    info "✓ setup:upgrade executado com sucesso"
+else
+    error "Erro ao executar setup:upgrade. Verifique os logs:"
+    tail -20 /tmp/magento_setup_upgrade.log
+    exit 1
+fi
+
+# Passo 7: Verificar status do módulo
+info "Passo 7: Verificando status do módulo..."
+MODULE_STATUS_OUTPUT=$(bin/clinotty bin/magento module:status MageDev_BrazilZipCode 2>&1 || echo "")
+
+if echo "$MODULE_STATUS_OUTPUT" | grep -qi "enabled\|is already enabled"; then
+    info "✓ Módulo está habilitado"
+elif echo "$MODULE_STATUS_OUTPUT" | grep -qi "disabled\|is already disabled"; then
+    warn "Módulo está desabilitado. Habilitando..."
+    if bin/clinotty bin/magento module:enable MageDev_BrazilZipCode; then
+        info "✓ Módulo habilitado"
+        info "Executando setup:upgrade novamente após habilitar..."
+        bin/clinotty bin/magento setup:upgrade
+    else
+        error "Não foi possível habilitar o módulo"
+        exit 1
+    fi
+else
+    warn "Não foi possível determinar o status do módulo"
+    warn "Tentando habilitar manualmente..."
+    bin/clinotty bin/magento module:enable MageDev_BrazilZipCode 2>/dev/null || true
+    bin/clinotty bin/magento setup:upgrade
+fi
+
+# Passo 8: Compilar código (se necessário)
+info "Passo 8: Verificando modo do Magento..."
+MAGENTO_MODE=$(bin/clinotty bin/magento deploy:mode:show 2>/dev/null | grep -i "mode" | grep -oE "(developer|production|default)" | head -1 || echo "unknown")
+
+if [ "$MAGENTO_MODE" = "production" ]; then
+    info "Modo de produção detectado. Compilando código..."
+    if bin/clinotty bin/magento setup:di:compile; then
+        info "✓ Código compilado"
+    else
+        warn "Erro ao compilar código. Continuando..."
+    fi
+else
+    info "Modo: $MAGENTO_MODE - Compilação não necessária"
+fi
+
+# Passo 9: Limpar cache final
+info "Passo 9: Limpando cache final..."
+bin/clinotty bin/magento cache:flush
+info "✓ Cache limpo"
+
+# Passo 10: Verificação final
+info "Passo 10: Verificação final..."
+echo ""
+echo "Status do módulo:"
+bin/clinotty bin/magento module:status MageDev_BrazilZipCode
+
+echo ""
+echo "Verificação no config.php:"
+if grep -q "MageDev_BrazilZipCode" src/app/etc/config.php; then
+    grep "MageDev_BrazilZipCode" src/app/etc/config.php
+    info "✓ Módulo encontrado no config.php"
+else
+    error "Módulo NÃO encontrado no config.php"
+fi
+
+echo ""
+info "=========================================="
+info "Instalação concluída!"
+info "=========================================="
+echo ""
+echo "Próximos passos:"
+echo "1. Verifique se não há erros nos logs: tail -f src/var/log/system.log"
+echo "2. Teste a funcionalidade do módulo no admin do Magento"
+echo "3. Se necessário, execute: bin/clinotty bin/magento setup:static-content:deploy"
+echo ""
+
+
+
+
+
+
+
+

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r \"tracking\\\\|track\\\\|rastreio\\\\|rastreamento\" /home/diogowsl/repositorio/docker-dani/src/app/code/Fast --include=*.php --include=*.xml -l)",
+      "Bash(find /home/diogowsl/repositorio/docker-dani/src/app/code/Frenet -type f \\\\\\(-name *.phtml -o -name *.xml \\\\\\))",
+      "Bash(find /home/diogowsl/repositorio/docker-dani/src/app -path */email* -name *.xml)",
+      "Bash(find /home/diogowsl/repositorio/docker-dani/src/app/code -name *.php -path *Shipment*)",
+      "Bash(find /home/diogowsl/repositorio/docker-dani/src/app -name *.xml -path */layout/*)",
+      "Bash(grep -r \"Track\\\\|Tracking\" /home/diogowsl/repositorio/docker-dani/src/app/code --include=*.php -l)",
+      "Bash(find /home/diogowsl/repositorio/docker-dani/src -path */email* -name *.html)"
+    ]
+  }
+}

@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Script para remover o atributo person_type do banco de dados
+# Usa credenciais do env.php do Magento
+
+# Extrair credenciais do env.php
+DB_HOST=$(php -r "require 'src/app/etc/env.php'; echo \$config['db']['connection']['default']['host'];")
+DB_NAME=$(php -r "require 'src/app/etc/env.php'; echo \$config['db']['connection']['default']['dbname'];")
+DB_USER=$(php -r "require 'src/app/etc/env.php'; echo \$config['db']['connection']['default']['username'];")
+DB_PASS=$(php -r "require 'src/app/etc/env.php'; echo \$config['db']['connection']['default']['password'];")
+
+echo "Removendo atributo person_type do banco de dados..."
+echo "Banco: ${DB_NAME}"
+
+docker-compose exec -T db mysql -u"${DB_USER}" -p"${DB_PASS}" "${DB_NAME}" <<EOF
+-- Remover o atributo person_type
+SET @attribute_id = (SELECT attribute_id FROM eav_attribute WHERE attribute_code = 'person_type' AND entity_type_id = (SELECT entity_type_id FROM eav_entity_type WHERE entity_type_code = 'customer'));
+
+-- Remover labels das opções primeiro (dependência)
+DELETE FROM eav_attribute_option_value 
+WHERE option_id IN (
+    SELECT option_id FROM eav_attribute_option 
+    WHERE attribute_id = @attribute_id
+);
+
+-- Remover opções do atributo (se for select)
+DELETE FROM eav_attribute_option 
+WHERE attribute_id = @attribute_id;
+
+-- Remover valores do atributo da tabela customer_entity_int (se existir)
+DELETE FROM customer_entity_int 
+WHERE attribute_id = @attribute_id;
+
+-- Remover o atributo da tabela customer_eav_attribute (se existir)
+DELETE FROM customer_eav_attribute 
+WHERE attribute_id = @attribute_id;
+
+-- Remover o atributo dos formulários (admin e frontend)
+DELETE FROM customer_form_attribute 
+WHERE attribute_id = @attribute_id;
+
+-- Remover o atributo person_type da tabela eav_attribute
+DELETE FROM eav_attribute 
+WHERE attribute_code = 'person_type' 
+AND entity_type_id = (SELECT entity_type_id FROM eav_entity_type WHERE entity_type_code = 'customer');
+
+SELECT 'Atributo person_type removido com sucesso!' AS Resultado;
+EOF
+
+echo "Limpando cache do Magento..."
+bin/clinotty bin/magento cache:flush
+
+echo "Concluído!"
+
