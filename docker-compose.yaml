@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   server:
     container_name: fast-nginx-server
@@ -11,14 +9,14 @@ services:
     volumes: &appvolumes
       - ~/.composer:/var/www/.composer:cached
       - sockdata:/sock
-      - /home/diogowsl/repositorio/docker-dani/src:/var/www/html
-      - /home/diogowsl/repositorio/docker-dani/dockerfiles/php/8.2/conf/php.ini:/usr/local/etc/php/php.ini
-      - /home/diogowsl/repositorio/docker-dani/nginx/magento2.conf:/etc/nginx/conf.d/magento2.conf
-      
+      - ./src:/var/www/html
+      - ./dockerfiles/php/8.3/conf/php.ini:/usr/local/etc/php/php.ini
+      - ./nginx/magento2.conf:/etc/nginx/conf.d/magento2.conf
+
   phpfpm:
     container_name: fast-phpfpm
     build:
-      context: ./dockerfiles/php/8.2/
+      context: ./dockerfiles/php/8.3/
       dockerfile: "Dockerfile"
     volumes: *appvolumes
     env_file: env/phpfpm.env
